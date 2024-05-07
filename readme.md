@@ -7,7 +7,7 @@ This project aims to provide a quick integration for translating video voices us
 Due to hardware limitations, the output files were not generated from the executor in the repository. The main function was reproduced in a Google Colab notebook, which allows the usage of GPU resources for running the deep learning models.
 
 Installing Coqui TTS from the main source was resulting in a metadata-generation-failed, so I've downloaded the model from a fork repository.
-[Building the TTS package f](https://github.com/coqui-ai/TTS/discussions/3705)
+[Building the TTS package](https://github.com/coqui-ai/TTS/discussions/3705)
 
 ### Tools
 
