@@ -1,0 +1,10 @@
+git+https://github.com/huggingface/transformers.git
+
+accelerate
+coqui-tts
+deep-translator
+ffmpeg-python
+moviepy
+numpy==1.24.3
+pydub
+torch

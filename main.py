@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 os.environ["COQUI_TOS_AGREED"] = "1" #  Agree Coqui-ai’s xTTS license for using Text-to-speech models. This will download a 1.87GB model.
 
+def clean_cuda() -> None:
+    """Empty CUDA cache for avoiding chrashes."""
+    logging.info("Cleaning CUDA")
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
 def convert_mp4_to_wav(video_file: str, wav_file: str) -> str:
     """Write a .wav file from the audio extracted from a video file."""
     logger.info(f"Converting {video_file} to {wav_file}")
@@ -61,7 +67,7 @@ def transcript_video_audio(
     logger.info(f"Transcribing {input_file} to {output_file}")
     generate_kwargs = dict()
     generate_kwargs['language'] = source_language
-    results = pipe(input_file, generate_kwargs)
+    results = pipe(input_file, generate_kwargs=generate_kwargs)
     with open(output_file, 'w') as transcription_file:
         transcription_file.write(results['text'])
 
@@ -135,15 +141,21 @@ def main(args):
     """Translate and dub a video."""
     logger.info("Starting execution")
 
+    os.makedirs('audio')
+    os.makedirs('transcriptions')
+
     input_video = args.input_video
     output_video = args.output_video
     input_name, _ = os.path.splitext(input_video)
     input_audio = os.path.join("audio", input_name + f"_{args.source_language}.wav")
     output_audio = os.path.join("audio", input_name + f"_{args.target_language}.wav")
-    source_transcription_file = os.path.join('transcription', input_name + f"_{args.source_language}.txt")
-    translated_transcription_file = os.path.join('transcription', input_name + f"_{args.target_language}.txt")
+    source_transcription_file = os.path.join('transcriptions', input_name + f"_{args.source_language}.txt")
+    translated_transcription_file = os.path.join('transcriptions', input_name + f"_{args.target_language}.txt")
 
     convert_mp4_to_wav(video_file=input_video, wav_file=input_audio)
+
+    if args.cuda_safety:
+        clean_cuda()
 
     pipe = create_transcription_model()
     transcription_results = transcript_video_audio(
@@ -154,6 +166,10 @@ def main(args):
         )
     source_transcription = transcription_results['text']
 
+    if args.cuda_safety:
+        del pipe
+        clean_cuda()
+
     translator = create_translation_model(
         source_language=args.source_language,
         target_language=args.target_language
@@ -161,6 +177,10 @@ def main(args):
     translated_text = translate_text(text_to_translate=source_transcription, translator=translator)
     with open(translated_transcription_file, 'w') as translated_file:
         translated_file.write(translated_text)
+
+    if args.cuda_safety:
+        del translator
+        clean_cuda()
 
     tts = create_text_to_speech_model()
     text_to_speech(
@@ -170,6 +190,11 @@ def main(args):
         audio_reference_file=input_audio,
         language=args.target_language
         )
+    
+    if args.cuda_safety:
+        del tts
+        clean_cuda()
+
     resize_audio_length(audio_file=output_audio, input_video=input_video)
     insert_audio_in_video(
         input_video=input_video,
@@ -183,6 +208,7 @@ if __name__ == "__main__":
     parser.add_argument('--output_video', type=str, required=True, help='Output video file')
     parser.add_argument('--source_language', type=str, default="pt", help='Source language of the video')
     parser.add_argument('--target_language', type=str, default="en", help='Target language for translation and dubbing')
+    parser.add_argument('--cuda_safety', action='store_true', help='Flag to disable CUDA cache safe management')
     
     parser.epilog = """
     Usage:
